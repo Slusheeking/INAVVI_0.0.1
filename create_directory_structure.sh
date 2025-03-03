@@ -24,6 +24,7 @@ mkdir -p autonomous_trading_system/src/trading_strategy/alpaca
 mkdir -p autonomous_trading_system/src/trading_strategy/signals
 mkdir -p autonomous_trading_system/src/monitoring/collectors
 mkdir -p autonomous_trading_system/src/monitoring/exporters
+mkdir -p autonomous_trading_system/src/monitoring/emergency
 mkdir -p autonomous_trading_system/src/monitoring/alerting
 mkdir -p autonomous_trading_system/src/monitoring/dashboard
 mkdir -p autonomous_trading_system/src/monitoring/analysis
@@ -34,6 +35,11 @@ mkdir -p autonomous_trading_system/src/continuous_learning/pipeline
 mkdir -p autonomous_trading_system/src/utils/database
 mkdir -p autonomous_trading_system/src/utils/logging
 mkdir -p autonomous_trading_system/src/utils/concurrency
+mkdir -p autonomous_trading_system/src/utils/database/migrations
+mkdir -p autonomous_trading_system/src/utils/database/schema
+mkdir -p autonomous_trading_system/src/backtesting/engine
+mkdir -p autonomous_trading_system/src/backtesting/analysis
+mkdir -p autonomous_trading_system/src/backtesting/reporting
 mkdir -p autonomous_trading_system/src/utils/serialization
 mkdir -p autonomous_trading_system/src/utils/time
 mkdir -p autonomous_trading_system/src/utils/metrics
@@ -106,6 +112,7 @@ touch autonomous_trading_system/src/monitoring/exporters/__init__.py
 touch autonomous_trading_system/src/monitoring/alerting/__init__.py
 touch autonomous_trading_system/src/monitoring/dashboard/__init__.py
 touch autonomous_trading_system/src/monitoring/analysis/__init__.py
+touch autonomous_trading_system/src/monitoring/emergency/__init__.py
 
 # Continuous learning packages
 touch autonomous_trading_system/src/continuous_learning/__init__.py
@@ -117,6 +124,13 @@ touch autonomous_trading_system/src/continuous_learning/pipeline/__init__.py
 # Utils packages
 touch autonomous_trading_system/src/utils/__init__.py
 touch autonomous_trading_system/src/utils/database/__init__.py
+touch autonomous_trading_system/src/utils/database/migrations/__init__.py
+touch autonomous_trading_system/src/utils/database/schema/__init__.py
+
+# Backtesting packages
+touch autonomous_trading_system/src/backtesting/__init__.py
+touch autonomous_trading_system/src/backtesting/engine/__init__.py
+touch autonomous_trading_system/src/backtesting/analysis/__init__.py
 touch autonomous_trading_system/src/utils/logging/__init__.py
 touch autonomous_trading_system/src/utils/concurrency/__init__.py
 touch autonomous_trading_system/src/utils/serialization/__init__.py
@@ -162,6 +176,13 @@ touch autonomous_trading_system/src/data_acquisition/pipeline/data_pipeline.py
 touch autonomous_trading_system/src/data_acquisition/pipeline/pipeline_scheduler.py
 touch autonomous_trading_system/src/data_acquisition/storage/timescale_manager.py
 touch autonomous_trading_system/src/data_acquisition/storage/data_schema.py
+
+# Create database schema and migration files
+touch autonomous_trading_system/src/utils/database/schema/tables.py
+touch autonomous_trading_system/src/utils/database/schema/indexes.py
+touch autonomous_trading_system/src/utils/database/schema/constraints.py
+touch autonomous_trading_system/src/utils/database/migrations/migration_manager.py
+touch autonomous_trading_system/src/utils/database/migrations/versions/v0001_initial_schema.py
 
 # Create feature engineering files
 touch autonomous_trading_system/src/feature_engineering/calculators/price_features.py
@@ -214,6 +235,14 @@ touch autonomous_trading_system/src/trading_strategy/signals/peak_detector.py
 touch autonomous_trading_system/src/trading_strategy/signals/entry_signal_generator.py
 touch autonomous_trading_system/src/trading_strategy/signals/holding_period_optimizer.py
 
+# Create backtesting files
+touch autonomous_trading_system/src/backtesting/engine/backtest_engine.py
+touch autonomous_trading_system/src/backtesting/engine/market_simulator.py
+touch autonomous_trading_system/src/backtesting/engine/execution_simulator.py
+touch autonomous_trading_system/src/backtesting/analysis/backtest_analyzer.py
+touch autonomous_trading_system/src/backtesting/analysis/strategy_evaluator.py
+touch autonomous_trading_system/src/backtesting/reporting/performance_report.py
+
 # Create monitoring files
 touch autonomous_trading_system/src/monitoring/collectors/system_metrics_collector.py
 touch autonomous_trading_system/src/monitoring/collectors/trading_metrics_collector.py
@@ -230,6 +259,11 @@ touch autonomous_trading_system/src/monitoring/analysis/dollar_profit_analyzer.p
 touch autonomous_trading_system/src/monitoring/analysis/performance_analyzer.py
 touch autonomous_trading_system/src/monitoring/analysis/attribution_analyzer.py
 touch autonomous_trading_system/src/monitoring/monitoring_manager.py
+# Create emergency stop files
+touch autonomous_trading_system/src/monitoring/emergency/emergency_stop_manager.py
+touch autonomous_trading_system/src/monitoring/emergency/position_liquidator.py
+touch autonomous_trading_system/src/monitoring/emergency/circuit_breaker.py
+touch autonomous_trading_system/src/monitoring/emergency/emergency_notification.py
 
 # Create continuous learning files
 touch autonomous_trading_system/src/continuous_learning/analysis/performance_analyzer.py
@@ -247,6 +281,8 @@ touch autonomous_trading_system/src/utils/database/redis_utils.py
 touch autonomous_trading_system/src/utils/database/connection_pool.py
 touch autonomous_trading_system/src/utils/database/connection_manager.py
 touch autonomous_trading_system/src/utils/database/query_builder.py
+touch autonomous_trading_system/src/utils/database/schema_manager.py
+touch autonomous_trading_system/src/utils/database/migration_runner.py
 touch autonomous_trading_system/src/utils/logging/logger.py
 touch autonomous_trading_system/src/utils/logging/log_formatter.py
 touch autonomous_trading_system/src/utils/concurrency/thread_pool.py
@@ -282,6 +318,8 @@ touch autonomous_trading_system/src/scripts/setup_database.py
 touch autonomous_trading_system/src/scripts/check_system_status.py
 touch autonomous_trading_system/src/scripts/generate_performance_report.py
 touch autonomous_trading_system/src/scripts/run_smoke_tests.py
+touch autonomous_trading_system/src/scripts/run_backtest.py
+touch autonomous_trading_system/src/scripts/emergency_stop.py
 touch autonomous_trading_system/src/scripts/setup_environment.py
 
 # Create documentation files
@@ -299,13 +337,15 @@ touch autonomous_trading_system/docs/10_deployment_subsystem.md
 touch autonomous_trading_system/docs/11_testing_subsystem.md
 touch autonomous_trading_system/docs/12_production_readiness.md
 touch autonomous_trading_system/docs/13_ci_cd_pipeline.md
-touch autonomous_trading_system/docs/14_api_reference.md
+touch autonomous_trading_system/docs/14_system_monitoring.md
 touch autonomous_trading_system/docs/15_database_schema.md
 touch autonomous_trading_system/docs/16_configuration_reference.md
-touch autonomous_trading_system/docs/17_troubleshooting_guide.md
-touch autonomous_trading_system/docs/18_performance_tuning_guide.md
-touch autonomous_trading_system/docs/19_security_guide.md
-touch autonomous_trading_system/docs/20_production_readiness_checklist.md
+touch autonomous_trading_system/docs/17_backtesting_guide.md
+touch autonomous_trading_system/docs/18_emergency_procedures.md
+touch autonomous_trading_system/docs/19_market_hours_scheduling.md
+touch autonomous_trading_system/docs/20_api_endpoints_reference.md
+touch autonomous_trading_system/docs/21_data_flow_integration.md
+touch autonomous_trading_system/docs/22_risk_management_position_sizing.md
 
 # Create deployment files
 # Docker files
@@ -323,6 +363,7 @@ touch autonomous_trading_system/deployment/docker/feature-engineering.Dockerfile
 touch autonomous_trading_system/deployment/docker/model-training.Dockerfile
 touch autonomous_trading_system/deployment/docker/trading-strategy.Dockerfile
 touch autonomous_trading_system/deployment/docker/monitoring.Dockerfile
+touch autonomous_trading_system/deployment/docker/backtesting.Dockerfile
 touch autonomous_trading_system/deployment/docker/continuous-learning.Dockerfile
 touch autonomous_trading_system/deployment/docker/gpu-accelerated.Dockerfile
 
@@ -366,6 +407,8 @@ touch autonomous_trading_system/deployment/kubernetes/development/monitoring-dep
 touch autonomous_trading_system/deployment/kubernetes/development/monitoring-service.yaml
 touch autonomous_trading_system/deployment/kubernetes/development/continuous-learning-deployment.yaml
 touch autonomous_trading_system/deployment/kubernetes/development/continuous-learning-service.yaml
+touch autonomous_trading_system/deployment/kubernetes/development/backtesting-deployment.yaml
+touch autonomous_trading_system/deployment/kubernetes/development/backtesting-service.yaml
 touch autonomous_trading_system/deployment/kubernetes/development/timescaledb-deployment.yaml
 touch autonomous_trading_system/deployment/kubernetes/development/timescaledb-service.yaml
 touch autonomous_trading_system/deployment/kubernetes/development/redis-deployment.yaml
@@ -388,6 +431,8 @@ touch autonomous_trading_system/deployment/kubernetes/production/monitoring-depl
 touch autonomous_trading_system/deployment/kubernetes/production/monitoring-service.yaml
 touch autonomous_trading_system/deployment/kubernetes/production/continuous-learning-deployment.yaml
 touch autonomous_trading_system/deployment/kubernetes/production/continuous-learning-service.yaml
+touch autonomous_trading_system/deployment/kubernetes/production/backtesting-deployment.yaml
+touch autonomous_trading_system/deployment/kubernetes/production/backtesting-service.yaml
 touch autonomous_trading_system/deployment/kubernetes/production/timescaledb-deployment.yaml
 touch autonomous_trading_system/deployment/kubernetes/production/timescaledb-service.yaml
 touch autonomous_trading_system/deployment/kubernetes/production/redis-deployment.yaml
@@ -849,6 +894,8 @@ data:
   focus_universe_size: "20"
   risk_percentage: "0.01"
   max_position_size: "1000.0"
+  emergency_stop_enabled: "true"
+  emergency_notification_channels: "slack,grafana"
 EOF
 
 cat > autonomous_trading_system/deployment/kubernetes/production/configmap.yaml << 'EOF'
@@ -867,6 +914,8 @@ data:
   focus_universe_size: "40"
   risk_percentage: "0.02"
   max_position_size: "2500.0"
+  emergency_stop_enabled: "true"
+  emergency_notification_channels: "slack,grafana"
 EOF
 
 # Create Docker Compose files
@@ -903,6 +952,12 @@ services:
     build:
       context: .
       dockerfile: deployment/docker/monitoring.Dockerfile
+    image: ats/monitoring:latest
+
+  backtesting:
+    build:
+      context: .
+      dockerfile: deployment/docker/backtesting.Dockerfile
     image: ats/monitoring:latest
 EOF
 
@@ -945,6 +1000,8 @@ redis = "^4.5.0"
 schedule = "^1.2.0"
 requests = "^2.28.0"
 aiohttp = "^3.8.0"
+alembic = "^1.10.0"  # For database migrations
+backtrader = "^1.9.76"  # For backtesting
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.3.0"
