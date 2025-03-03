@@ -1,10 +1,14 @@
-# Enhanced Dynamic Ticker Selection and Position Sizing Guide
+# Trading Strategy Subsystem
 
-## Overview
+## 1. Introduction
 
-The AI Trading System implements a sophisticated approach to ticker selection and position sizing that optimizes both computational resources and capital allocation. This enhanced guide provides a comprehensive overview of the dynamic ticker selection and risk-based position sizing components, including detailed explanations of the tiered selection approach, opportunity scoring, conviction scoring, and the 2% risk rule implementation.
+The Trading Strategy Subsystem is a critical component of the Autonomous Trading System responsible for selecting the most promising tickers from a large universe, calculating optimal position sizes, and managing risk. It implements a sophisticated approach to ticker selection and position sizing that optimizes both computational resources and capital allocation.
 
-## System Architecture
+This document provides a comprehensive overview of the Trading Strategy Subsystem, including its architecture, components, ticker selection process, position sizing methodology, and integration with other subsystems.
+
+## 2. System Architecture Overview
+
+The Trading Strategy Subsystem follows a modular architecture with several key components:
 
 ```mermaid
 flowchart TD
@@ -43,9 +47,9 @@ flowchart TD
     end
 ```
 
-## Tiered Selection Approach
+## 3. Tiered Selection Approach
 
-The system implements a tiered selection approach to efficiently manage a large universe of tickers:
+The Trading Strategy Subsystem implements a tiered selection approach to efficiently manage a large universe of tickers:
 
 ```mermaid
 flowchart TD
@@ -67,13 +71,77 @@ flowchart TD
     A --> H
 ```
 
-## Data Flow Process
+This tiered approach allows the system to:
+
+1. **Efficiently Manage Computational Resources**: By focusing intensive processing on a smaller subset of tickers
+2. **Optimize Capital Allocation**: By concentrating capital on the highest conviction opportunities
+3. **Maintain Broad Market Coverage**: By monitoring a large universe of tickers for emerging opportunities
+
+## 4. Key Components
+
+### 4.1 DynamicTickerSelector Class
+
+The `DynamicTickerSelector` class is responsible for selecting the most promising tickers from a large universe based on opportunity scores and conviction scores.
+
+```mermaid
+classDiagram
+    class DynamicTickerSelector {
+        +max_active_tickers: int
+        +focus_universe_size: int
+        +min_volume: int
+        +min_volatility: float
+        +opportunity_threshold: float
+        +ticker_universe: List[str]
+        +active_tickers: List[str]
+        +focus_universe: List[str]
+        +ticker_scores: Dict[str, float]
+        +conviction_scores: Dict[str, float]
+        +ticker_data: Dict[str, DataFrame]
+        +ticker_metadata: Dict[str, Dict]
+        +update_market_data(market_data)
+        +calculate_opportunity_scores()
+        +calculate_conviction_scores()
+        +select_active_tickers()
+        +select_focus_universe()
+        +get_ticker_metadata(ticker)
+        +get_top_opportunities(n)
+        +save_state(filepath)
+        +load_state(filepath)
+        -_load_ticker_universe()
+    }
+```
+
+### 4.2 RiskBasedPositionSizer Class
+
+The `RiskBasedPositionSizer` class is responsible for calculating position sizes based on the 2% risk rule and other constraints.
+
+```mermaid
+classDiagram
+    class RiskBasedPositionSizer {
+        +account_size: float
+        +risk_percentage: float
+        +max_position_size: float
+        +min_position_size: float
+        +max_positions: int
+        +focus_allocation_boost: float
+        +max_risk_amount: float
+        +calculate_position_size(ticker, entry_price, stop_price, conviction_score, volatility_adjustment, is_focus_ticker)
+        +calculate_atr_based_stop(ticker, entry_price, atr, direction, atr_multiplier)
+        +calculate_volatility_adjustment(ticker, atr, price)
+        +allocate_capital(opportunities, current_positions)
+        +update_account_size(new_account_size)
+    }
+```
+
+## 5. Data Flow Process
+
+The data flow through the Trading Strategy Subsystem is as follows:
 
 ```mermaid
 sequenceDiagram
     participant App as Application
     participant TS as TickerSelector
-    participant PS as PositionSizer
+    participant PS as RiskBasedPositionSizer
     participant DP as DataPipeline
     participant DB as TimescaleDB
     
@@ -106,65 +174,9 @@ sequenceDiagram
     DP-->>App: Return pipeline_results
 ```
 
-## Key Components
+## 6. Dynamic Ticker Selection Process
 
-### DynamicTickerSelector Class
-
-The `DynamicTickerSelector` class is responsible for selecting the most promising tickers from a large universe based on opportunity scores and conviction scores.
-
-```mermaid
-classDiagram
-    class DynamicTickerSelector {
-        +max_active_tickers: int
-        +focus_universe_size: int
-        +min_volume: int
-        +min_volatility: float
-        +opportunity_threshold: float
-        +ticker_universe: List[str]
-        +active_tickers: List[str]
-        +focus_universe: List[str]
-        +ticker_scores: Dict[str, float]
-        +conviction_scores: Dict[str, float]
-        +ticker_data: Dict[str, DataFrame]
-        +ticker_metadata: Dict[str, Dict]
-        +update_market_data(market_data)
-        +calculate_opportunity_scores()
-        +calculate_conviction_scores()
-        +select_active_tickers()
-        +select_focus_universe()
-        +get_ticker_metadata(ticker)
-        +get_top_opportunities(n)
-        +save_state(filepath)
-        +load_state(filepath)
-        -_load_ticker_universe()
-    }
-```
-
-### RiskBasedPositionSizer Class
-
-The `RiskBasedPositionSizer` class is responsible for calculating position sizes based on the 2% risk rule and other constraints.
-
-```mermaid
-classDiagram
-    class RiskBasedPositionSizer {
-        +account_size: float
-        +risk_percentage: float
-        +max_position_size: float
-        +min_position_size: float
-        +max_positions: int
-        +focus_allocation_boost: float
-        +max_risk_amount: float
-        +calculate_position_size(ticker, entry_price, stop_price, conviction_score, volatility_adjustment, is_focus_ticker)
-        +calculate_atr_based_stop(ticker, entry_price, atr, direction, atr_multiplier)
-        +calculate_volatility_adjustment(ticker, atr, price)
-        +allocate_capital(opportunities, current_positions)
-        +update_account_size(new_account_size)
-    }
-```
-
-## Dynamic Ticker Selection Process
-
-### Opportunity Score Calculation
+### 6.1 Opportunity Score Calculation
 
 The opportunity score is calculated based on volatility, volume, momentum, and pattern recognition:
 
@@ -255,7 +267,7 @@ def calculate_opportunity_scores(self) -> Dict[str, float]:
     return scores
 ```
 
-### Conviction Score Calculation
+### 6.2 Conviction Score Calculation
 
 The conviction score is calculated based on trend strength and volatility efficiency:
 
@@ -331,7 +343,7 @@ def calculate_conviction_scores(self) -> Dict[str, float]:
     return conviction_scores
 ```
 
-### Active Universe Selection
+### 6.3 Active Universe Selection
 
 The active universe is selected based on opportunity scores:
 
@@ -366,7 +378,7 @@ def select_active_tickers(self) -> List[str]:
     return self.active_tickers
 ```
 
-### Focus Universe Selection
+### 6.4 Focus Universe Selection
 
 The focus universe is selected based on conviction scores:
 
@@ -402,9 +414,9 @@ def select_focus_universe(self) -> List[str]:
     return self.focus_universe
 ```
 
-## Risk-Based Position Sizing Process
+## 7. Risk-Based Position Sizing Process
 
-### ATR-Based Stop Calculation
+### 7.1 ATR-Based Stop Calculation
 
 The system calculates stop prices based on Average True Range (ATR):
 
@@ -433,7 +445,7 @@ def calculate_atr_based_stop(self, ticker: str, entry_price: float, atr: float,
     return stop_price
 ```
 
-### Volatility Adjustment
+### 7.2 Volatility Adjustment
 
 The system adjusts position sizes based on volatility:
 
@@ -468,7 +480,7 @@ def calculate_volatility_adjustment(self, ticker: str, atr: float, price: float)
     return adjustment
 ```
 
-### Position Size Calculation
+### 7.3 Position Size Calculation
 
 The system calculates position sizes based on the 2% risk rule:
 
@@ -584,7 +596,7 @@ def calculate_position_size(self, ticker: str, entry_price: float, stop_price: f
     return result
 ```
 
-### Capital Allocation
+### 7.4 Capital Allocation
 
 The system allocates capital across multiple trading opportunities:
 
@@ -656,7 +668,7 @@ def allocate_capital(self, opportunities: List[Dict], current_positions: List[Di
     return allocated_positions
 ```
 
-## Integration with Production Pipeline
+## 8. Integration with Production Pipeline
 
 The dynamic ticker selection and position sizing components are integrated into the production data pipeline:
 
@@ -723,9 +735,9 @@ def run_full_pipeline(self, date=None):
     }
 ```
 
-## Performance Considerations
+## 9. Performance Considerations
 
-### Tiered Resource Allocation
+### 9.1 Tiered Resource Allocation
 
 The system optimizes computational resources through tiered resource allocation:
 
@@ -744,7 +756,7 @@ flowchart TD
     G --> J[High Resource Usage]
 ```
 
-### Parallel Processing
+### 9.2 Parallel Processing
 
 The system uses parallel processing for opportunity score calculation:
 
@@ -756,7 +768,7 @@ flowchart TD
     D --> E[Sort and Filter]
 ```
 
-### Memory Optimization
+### 9.3 Memory Optimization
 
 The system optimizes memory usage through efficient data structures:
 
@@ -771,7 +783,72 @@ flowchart TD
     D --> G[Load Data on Demand]
 ```
 
-## Database Integration
+## 10. Integration with Other Subsystems
+
+The Trading Strategy Subsystem integrates with several other subsystems of the Autonomous Trading System:
+
+```mermaid
+flowchart LR
+    subgraph "Data Acquisition Subsystem"
+        DA[Data Acquisition]
+        DB[(TimescaleDB)]
+    end
+    
+    subgraph "Feature Engineering Subsystem"
+        FE[Feature Engineering]
+        FC[Feature Cache]
+        FS[Feature Store]
+    end
+    
+    subgraph "Model Training Subsystem"
+        MT[Model Training]
+        MR[Model Registry]
+        DPO[Dollar Profit Optimizer]
+    end
+    
+    subgraph "Trading Strategy Subsystem"
+        TS[Ticker Selection]
+        PS[Position Sizing]
+        OG[Order Generation]
+    end
+    
+    subgraph "Execution Subsystem"
+        EX[Alpaca API]
+        PM[Position Management]
+    end
+    
+    subgraph "Monitoring Subsystem"
+        MON[Monitoring]
+        PROM[Prometheus]
+        GRAF[Grafana]
+    end
+    
+    DA --> DB
+    DB --> FE
+    FE --> FC
+    FC --> FS
+    FS --> MT
+    MT --> MR
+    MR --> DPO
+    DPO --> TS
+    TS --> PS
+    PS --> OG
+    OG --> EX
+    EX --> PM
+    PM --> MON
+    MON --> PROM
+    PROM --> GRAF
+```
+
+Key integration points:
+
+1. **Data Acquisition Subsystem**: The Trading Strategy Subsystem retrieves market data from TimescaleDB, which is populated by the Data Acquisition Subsystem
+2. **Feature Engineering Subsystem**: The Trading Strategy Subsystem uses features from the Feature Engineering Subsystem for ticker selection and position sizing
+3. **Model Training Subsystem**: The Trading Strategy Subsystem receives trading signals from the Model Training Subsystem's Dollar Profit Optimizer
+4. **Execution Subsystem**: The Trading Strategy Subsystem sends orders to the Execution Subsystem for execution
+5. **Monitoring Subsystem**: The Trading Strategy Subsystem reports metrics to the Monitoring Subsystem for visualization and alerting
+
+## 11. Database Integration
 
 Position information is stored in the database for tracking and analysis:
 
@@ -796,7 +873,7 @@ flowchart TD
     M --> Q[focus_universe]
 ```
 
-## Best Practices
+## 12. Best Practices
 
 1. **Use tiered selection approach** - Efficiently manage a large universe of tickers by focusing computational resources on the most promising opportunities
 2. **Implement the 2% risk rule** - Ensure consistent risk management across all trades
@@ -809,9 +886,9 @@ flowchart TD
 9. **Monitor performance metrics** - Track opportunity scores, conviction scores, and position sizes over time
 10. **Regularly update universe** - Periodically review and update the primary universe to include new opportunities
 
-## Future Enhancements
+## 13. Future Enhancements
 
-### Enhanced Opportunity Scoring
+### 13.1 Enhanced Opportunity Scoring
 
 ```mermaid
 flowchart TD
@@ -826,7 +903,7 @@ flowchart TD
     E --> I[Regime-Specific Thresholds]
 ```
 
-### Advanced Position Sizing
+### 13.2 Advanced Position Sizing
 
 ```mermaid
 flowchart TD
@@ -839,7 +916,7 @@ flowchart TD
     D --> G[Adjust Boost Based on Market Conditions]
 ```
 
-### Real-Time Adaptation
+### 13.3 Real-Time Adaptation
 
 ```mermaid
 flowchart TD
@@ -852,6 +929,8 @@ flowchart TD
     D --> G[Adjust Based on Market Regime]
 ```
 
-## Conclusion
+## 14. Conclusion
 
-The dynamic ticker selection and position sizing components provide a robust framework for efficiently managing a large universe of tickers while maintaining strict risk controls. The tiered selection approach optimizes computational resources and capital allocation, focusing on the highest conviction opportunities while maintaining broad market coverage. The risk-based position sizing ensures consistent risk management across all trades, with adjustments for volatility, conviction, and focus status.
+The Trading Strategy Subsystem provides a robust framework for efficiently managing a large universe of tickers while maintaining strict risk controls. The tiered selection approach optimizes computational resources and capital allocation, focusing on the highest conviction opportunities while maintaining broad market coverage. The risk-based position sizing ensures consistent risk management across all trades, with adjustments for volatility, conviction, and focus status.
+
+By implementing the recommended enhancements, the subsystem can become more adaptive to changing market conditions, ultimately leading to better trading decisions and higher profitability.

@@ -25,6 +25,7 @@ autonomous_trading_system/
 ├── deployment/                    # Deployment configurations
 │   ├── docker/                    # Docker configurations
 │   ├── kubernetes/                # Kubernetes configurations
+│   ├── ci_cd/                     # CI/CD configurations
 │   └── monitoring/                # Monitoring configurations
 ├── notebooks/                     # Jupyter notebooks for analysis
 └── tools/                         # Development tools
@@ -43,6 +44,8 @@ autonomous_trading_system/
 | `trading_config.py` | Trading configuration |
 | `model_config.py` | Model configuration |
 | `monitoring_config.py` | Monitoring configuration |
+| `ci_cd_config.py` | CI/CD configuration |
+| `hardware_config.py` | Hardware configuration (GPU, CPU) |
 
 ### Data Acquisition (`src/data_acquisition/`)
 
@@ -103,6 +106,7 @@ autonomous_trading_system/
 | `optimization/dollar_profit_objective.py` | Dollar profit objective function |
 | `optimization/hyperparameter_tuner.py` | Hyperparameter tuner |
 | `optimization/mixed_precision_adapter.py` | Mixed precision adapter for GPU acceleration |
+| `optimization/gpu_accelerator.py` | GPU acceleration for model training |
 | `validation/` | Validation components |
 | `validation/cross_timeframe_validator.py` | Cross-timeframe validator |
 | `validation/walk_forward_validator.py` | Walk-forward validator |
@@ -121,7 +125,7 @@ autonomous_trading_system/
 | `selection/ticker_selector.py` | Dynamic ticker selector |
 | `selection/timeframe_selector.py` | Timeframe selector |
 | `sizing/` | Position sizing components |
-| `sizing/position_sizer.py` | Risk-based position sizer |
+| `sizing/risk_based_position_sizer.py` | RiskBasedPositionSizer implementation |
 | `sizing/portfolio_allocator.py` | Portfolio allocator |
 | `execution/` | Execution components |
 | `execution/order_generator.py` | Smart order generator |
@@ -218,6 +222,7 @@ autonomous_trading_system/
 | `run_monitoring.py` | Script to run monitoring |
 | `run_continuous_learning.py` | Script to run continuous learning |
 | `system_controller.py` | System controller script |
+| `setup_environment.py` | Environment setup script |
 
 ## Tests Structure (`tests/`)
 
@@ -253,6 +258,8 @@ autonomous_trading_system/
 | `18_performance_tuning_guide.md` | Performance tuning guide |
 | `19_security_guide.md` | Security guide |
 | `20_production_readiness_checklist.md` | Production readiness checklist |
+| `documentation_consistency_analysis.md` | Documentation consistency analysis |
+| `documentation_standardization_changes.md` | Documentation standardization changes |
 
 ## Deployment Structure (`deployment/`)
 
@@ -265,6 +272,7 @@ autonomous_trading_system/
 | `docker-compose.dev.yml` | Development Docker Compose configuration |
 | `docker-compose.prod.yml` | Production Docker Compose configuration |
 | `.dockerignore` | Docker ignore file |
+| `gpu-accelerated.Dockerfile` | GPU-accelerated Dockerfile |
 
 ### Kubernetes (`deployment/kubernetes/`)
 
@@ -277,6 +285,19 @@ autonomous_trading_system/
 | `ingress.yaml` | Kubernetes Ingress configuration |
 | `pv.yaml` | Kubernetes PersistentVolume configuration |
 | `pvc.yaml` | Kubernetes PersistentVolumeClaim configuration |
+
+### CI/CD (`deployment/ci_cd/`)
+
+| File/Directory | Description |
+|----------------|-------------|
+| `.github/` | GitHub Actions configuration |
+| `.github/workflows/` | GitHub Actions workflows |
+| `.github/workflows/ci.yml` | CI workflow configuration |
+| `.github/workflows/test.yml` | Test workflow configuration |
+| `.github/workflows/deploy.yml` | Deployment workflow configuration |
+| `.github/workflows/coverage.yml` | Coverage reporting workflow |
+| `.github/workflows/performance.yml` | Performance testing workflow |
+| `.github/workflows/notify.yml` | Notification workflow |
 
 ### Monitoring (`deployment/monitoring/`)
 
@@ -295,6 +316,8 @@ autonomous_trading_system/
 | `grafana/dashboards/trading_dashboard.json` | Trading dashboard definition |
 | `grafana/dashboards/model_dashboard.json` | Model dashboard definition |
 | `grafana/dashboards/data_pipeline_dashboard.json` | Data pipeline dashboard definition |
+| `grafana/dashboards/ci_cd_dashboard.json` | CI/CD dashboard definition |
+| `grafana/dashboards/gpu_performance_dashboard.json` | GPU performance dashboard definition |
 
 ## Setup Instructions
 
@@ -311,6 +334,8 @@ cd autonomous-trading-system
 
 ```bash
 cp .env.sample .env
+# or use the example file
+cp .env.example .env
 ```
 
 Edit the `.env` file to include your API keys and configuration:
@@ -338,6 +363,7 @@ REDIS_DB=0
 PROMETHEUS_PORT=9090
 GRAFANA_PORT=3000
 SLACK_WEBHOOK_URL=your_slack_webhook_url
+GITHUB_TOKEN=your_github_token
 
 # Trading Configuration
 MAX_ACTIVE_TICKERS=150
@@ -380,6 +406,7 @@ source ~/.bashrc
 # Install Docker
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
+sudo usermod -aG docker $USER
 
 # Install Docker Compose
 sudo curl -L "https://github.com/docker/compose/releases/download/v2.15.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -479,6 +506,7 @@ python -m src.scripts.check_system_status
 pip install -r requirements-dev.txt
 
 # Set up pre-commit hooks
+pip install pre-commit
 pre-commit install
 ```
 
@@ -491,6 +519,14 @@ pytest
 # Run specific tests
 pytest tests/unit/data_acquisition/
 pytest tests/integration/trading_strategy/
+```
+
+#### 5.3 Set Up CI/CD
+
+```bash
+# Configure GitHub Actions
+mkdir -p .github/workflows
+cp deployment/ci_cd/.github/workflows/* .github/workflows/
 ```
 
 ## Conclusion

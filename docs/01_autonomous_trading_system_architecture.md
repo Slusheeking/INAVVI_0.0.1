@@ -8,7 +8,7 @@ The ATS is built with a modular architecture that enables continuous learning an
 
 ## System Architecture Overview
 
-The Autonomous Trading System follows a modular architecture with six primary subsystems:
+The Autonomous Trading System follows a modular architecture with seven primary subsystems:
 
 1. **Data Acquisition & Processing**: Gathers and validates market data from various sources
 2. **Feature Engineering & Storage**: Calculates and stores features from raw market data
@@ -16,6 +16,7 @@ The Autonomous Trading System follows a modular architecture with six primary su
 4. **Trading Strategy & Execution**: Executes trades based on model predictions
 5. **Monitoring & Analytics**: Tracks system performance and health
 6. **Continuous Learning & Adaptation**: Adapts the system to changing market conditions
+7. **CI/CD Pipeline**: Automates building, testing, and deployment of the system
 
 ```mermaid
 flowchart TD
@@ -60,6 +61,13 @@ flowchart TD
         W1 --> X1[Automated Model Retraining]
         X1 --> Y1[Adaptive Parameter Tuning]
         Y1 --> G1
+    end
+    
+    subgraph "CI/CD Pipeline"
+        Z1[Source Control] --> Z2[Build Process]
+        Z2 --> Z3[Automated Testing]
+        Z3 --> Z4[Deployment]
+        Z4 --> Z5[Monitoring & Alerting]
     end
 ```
 
@@ -170,6 +178,24 @@ The Continuous Learning & Adaptation subsystem ensures the system adapts to chan
 - Adaptive parameter tuning
 - Market regime-based adjustments
 
+### 7. CI/CD Pipeline
+
+The CI/CD Pipeline subsystem automates the building, testing, and deployment of the system.
+
+**Key Components:**
+- **Source Control**: Manages code versions and collaboration
+- **Build Process**: Automates building of Docker images
+- **Automated Testing**: Runs tests to ensure code quality
+- **Deployment**: Automates deployment to different environments
+- **Monitoring & Alerting**: Tracks pipeline health and notifies of issues
+
+**Key Features:**
+- Git Flow branching strategy
+- Docker-based builds
+- Comprehensive automated testing
+- Multi-environment deployment
+- Slack notifications for pipeline events
+
 ## Data Flow
 
 The data flows through the system as follows:
@@ -195,6 +221,7 @@ flowchart LR
     N --> F
     N --> D
     N --> H
+    N --> Z[CI/CD Pipeline]
 ```
 
 ## Operational Workflow
@@ -231,6 +258,11 @@ The system operates according to the following workflow:
    - Models are retrained based on performance
    - Parameters are adjusted based on market conditions
 
+7. **CI/CD Pipeline Phase**:
+   - Code changes are committed to source control
+   - Automated builds and tests are run
+   - Successful changes are deployed to the appropriate environment
+
 ## Technical Requirements
 
 ### Hardware Requirements
@@ -252,6 +284,7 @@ The system operates according to the following workflow:
 - TensorFlow or PyTorch
 - XGBoost
 - Pandas, NumPy, Scikit-learn
+- GitHub Actions or similar CI/CD tool
 - Alpaca SDK
 
 ### API Requirements
@@ -269,6 +302,7 @@ The system operates according to the following workflow:
 - **Adaptive Exit Timing**: Identifies optimal exit points based on market conditions
 - **Comprehensive Monitoring**: Tracks system performance and health
 - **Continuous Learning**: Adapts to changing market conditions
+- **Automated Deployment**: Ensures consistent and reliable deployment
 
 ## Conclusion
 

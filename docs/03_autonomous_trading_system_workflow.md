@@ -19,6 +19,7 @@ flowchart TD
     TS[Trading Strategy & Execution]
     MA[Monitoring & Analytics]
     CL[Continuous Learning & Adaptation]
+    CD[CI/CD Pipeline]
     
     %% Data Flow
     DA --> FE
@@ -27,6 +28,7 @@ flowchart TD
     TS --> MA
     MA --> CL
     CL --> MT
+    CD --> DA
     CL --> TS
     
     %% External Systems
@@ -58,6 +60,7 @@ flowchart TD
     PR --> GR
     MA --> SL
 ```
+
 
 ## Detailed Subsystem Workflows
 
@@ -298,7 +301,7 @@ flowchart TD
         DTS[Dynamic Ticker Selector]
         TS[Timeframe Selector]
         DPO[Dollar Profit Optimizer]
-        PS[Position Sizer]
+        PS[RiskBasedPositionSizer]
         PD[Peak Detector]
         OG[Order Generator]
         OTS[Order Type Selector]
@@ -335,7 +338,7 @@ sequenceDiagram
     participant DTS as Dynamic Ticker Selector
     participant TS as Timeframe Selector
     participant DPO as Dollar Profit Optimizer
-    participant PS as Position Sizer
+    participant PS as RiskBasedPositionSizer
     participant OG as Order Generator
     participant OTS as Order Type Selector
     participant AI as Alpaca Integration
@@ -548,15 +551,15 @@ flowchart TD
     MR[Model Registry]
     FS[Feature Store]
     DTS[Dynamic Ticker Selector]
-    TS[Timeframe Selector]
-    PS[Position Sizer]
+    TSel[Timeframe Selector]
+    PS[RiskBasedPositionSizer]
     
     %% External Connections
     TS1 --> PA
     CLP --> MR
     CLP --> FS
     MRD --> DTS
-    APT --> TS
+    APT --> TSel
     APT --> PS
 ```
 
@@ -575,8 +578,8 @@ sequenceDiagram
     participant MR as Model Registry
     participant FS as Feature Store
     participant DTS as Dynamic Ticker Selector
-    participant TS as Timeframe Selector
-    participant PS as Position Sizer
+    participant TSel as TimeframeSelector
+    participant PS as RiskBasedPositionSizer
     
     PA->>TS1: Query performance data
     TS1->>PA: Return performance data
@@ -596,7 +599,7 @@ sequenceDiagram
     PA->>APT: Send parameter performance
     APT->>APT: Analyze parameter sensitivity
     APT->>APT: Calculate optimal parameters
-    APT->>TS: Update timeframe selection parameters
+    APT->>TSel: Update timeframe selection parameters
     APT->>PS: Update position sizing parameters
     
     PA->>EW: Send model ensemble performance
@@ -620,6 +623,86 @@ sequenceDiagram
     CLP->>FS: Update feature configuration
 ```
 
+### 7. CI/CD Pipeline Workflow
+
+This diagram shows the detailed workflow of the CI/CD Pipeline subsystem:
+
+```mermaid
+flowchart TD
+    %% CI/CD Pipeline Components
+    subgraph "CI/CD Pipeline"
+        SC[Source Control]
+        BP[Build Process]
+        AT[Automated Testing]
+        DP[Deployment]
+        MA[Monitoring & Alerting]
+        
+        SC --> BP
+        BP --> AT
+        AT --> DP
+        DP --> MA
+        MA --> SC
+    end
+    
+    %% External Systems
+    GH[(GitHub)]
+    DR[(Docker Registry)]
+    K8S[(Kubernetes)]
+    SL[Slack]
+    
+    %% External Connections
+    GH --> SC
+    BP --> DR
+    DP --> K8S
+    MA --> SL
+```
+
+#### CI/CD Process Flow
+
+```mermaid
+sequenceDiagram
+    participant DEV as Developer
+    participant GH as GitHub
+    participant GA as GitHub Actions
+    participant DR as Docker Registry
+    participant UT as Unit Tests
+    participant IT as Integration Tests
+    participant PT as Performance Tests
+    participant K8S as Kubernetes
+    participant SL as Slack
+    
+    DEV->>GH: Push code changes
+    GH->>GA: Trigger CI workflow
+    
+    GA->>GA: Checkout code
+    GA->>GA: Install dependencies
+    
+    GA->>UT: Run unit tests
+    UT->>GA: Return test results
+    
+    GA->>GA: Build Docker images
+    GA->>DR: Push Docker images
+    
+    GA->>IT: Run integration tests
+    IT->>GA: Return test results
+    
+    GA->>PT: Run performance tests
+    PT->>GA: Return test results
+    
+    alt Tests pass
+        GA->>K8S: Deploy to development
+        K8S->>GA: Return deployment status
+        
+        alt Branch is main
+            GA->>K8S: Deploy to production
+            K8S->>GA: Return deployment status
+        end
+    end
+    
+    GA->>SL: Send notification
+    SL->>DEV: Notify developer
+```
+
 ## Complete System Sequence Diagram
 
 This diagram shows the complete system workflow as a sequence of operations:
@@ -633,6 +716,7 @@ sequenceDiagram
     participant TS as Trading Strategy
     participant MA as Monitoring & Analytics
     participant CL as Continuous Learning
+    participant CD as CI/CD Pipeline
     
     %% Data Acquisition Phase
     DS->>DA: Provide market data
@@ -670,6 +754,12 @@ sequenceDiagram
     CL->>CL: Analyze performance
     CL->>MT: Update models
     CL->>TS: Update parameters
+
+    %% CI/CD Phase
+    Note over CD: Continuous Integration & Deployment
+    CD->>CD: Build and test code
+    CD->>CD: Deploy to environments
+    CD->>CD: Monitor deployments
     
     %% Database Interactions
     Note over DB: TimescaleDB & Redis
@@ -685,7 +775,7 @@ sequenceDiagram
     participant DTS as Dynamic Ticker Selector
     participant TS as Timeframe Selector
     participant DPO as Dollar Profit Optimizer
-    participant PS as Position Sizer
+    participant PS as RiskBasedPositionSizer
     participant AI as Alpaca Integration
     participant PD as Peak Detector
     participant ME as Market End (4:00 PM)
@@ -836,5 +926,7 @@ flowchart TD
 These workflow diagrams provide a comprehensive visualization of the Autonomous Trading System, showing how data and control flow through the system. The modular architecture allows for clear separation of concerns while ensuring that all components work together seamlessly to create an adaptive, high-performance trading system.
 
 The system's workflow is designed to be robust, with clear data flows and control paths. Each subsystem has well-defined responsibilities and interfaces, allowing for independent development and testing while ensuring that the system as a whole functions cohesively.
+
+The CI/CD pipeline ensures that code changes are automatically built, tested, and deployed in a consistent and reliable manner, reducing the risk of errors and improving the overall quality of the system.
 
 By following these workflows, developers can understand how the system operates and how to extend or modify specific components without disrupting the overall system functionality.

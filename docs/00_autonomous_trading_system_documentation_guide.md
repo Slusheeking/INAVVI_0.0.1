@@ -20,6 +20,9 @@ This guide provides an overview of the documentation structure for the autonomou
    - Detailed description of each system component
    - APIs and interfaces
 
+5. **Implementation Plan** (autonomous_trading_system_implementation_plan.md)
+   - Comprehensive plan for implementing the system
+
 ## Additional Documentation
 - Comprehensive AI Trading System Implementation Guide
 - Enhanced Multi-Timeframe Feature Engineering Guide
@@ -33,7 +36,11 @@ This guide provides an overview of the documentation structure for the autonomou
 - AI Trading System Components Technical Overview
 - Data Pipeline Scheduler Architecture
 - AI Trading System Overview
-- AI Trading System Directory Structure
+- Monitoring Infrastructure with Prometheus and Grafana
+- Kubernetes Deployment Specifications
+- TensorFlow Implementation with GH200
+- Testing Framework Specifications
+- CI/CD Pipeline Specifications
 
 ## How to Use This Documentation
 This documentation is designed to provide a comprehensive understanding of the autonomous trading system. Start with the architecture overview to get a high-level understanding, then dive into specific components as needed.
