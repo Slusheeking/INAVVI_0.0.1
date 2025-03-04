@@ -31,6 +31,17 @@ REDIS_CONFIG = {
     'port': int(os.getenv('REDIS_PORT', '6379')),
     'db': int(os.getenv('REDIS_DB', '0')),
     'decode_responses': True,
+    'socket_timeout': 5,
+    'socket_connect_timeout': 5,
+    'retry_on_timeout': True,
+    'health_check_interval': 30,
+}
+
+REDIS_PERSISTENCE_CONFIG = {
+    'save_intervals': [(900, 1), (300, 10), (60, 10000)],  # (seconds, changes)
+    'appendonly': True,
+    'maxmemory': '1gb',
+    'maxmemory_policy': 'volatile-lru',
 }
 
 # SQLAlchemy Connection String
@@ -114,7 +125,7 @@ HYPERTABLE_CONFIG = {
 # Compression Configuration
 COMPRESSION_CONFIG = {
     'enabled': False,  # Temporarily disabled due to syntax issues
-    'compress_after': '7 days',
+    'compress_after': '7 days',  # Compress chunks older than 7 days
     'compression_level': 9,  # 0-9, where 9 is highest compression
 }
 
@@ -154,6 +165,19 @@ RETENTION_CONFIG = {
     },
 }
 
+# Backup Configuration
+BACKUP_CONFIG = {
+    'enabled': True,
+    'schedule': '0 2 * * *',  # Daily at 2 AM
+    'retention_days': 7,  # Keep backups for 7 days
+    'timescaledb': {
+        'backup_dir': '/timescaledb_backups',
+    },
+    'redis': {
+        'backup_dir': '/redis_backups',
+    },
+}
+
 # Database Migration Configuration
 MIGRATION_CONFIG = {
     'script_location': 'src/utils/database/migrations',
@@ -177,3 +201,18 @@ def get_redis_connection_params() -> Dict[str, Any]:
         Dictionary of Redis connection parameters
     """
     return REDIS_CONFIG.copy()
+
+def get_redis_persistence_config() -> Dict[str, Any]:
+    """
+    Get Redis persistence configuration.
+    
+    Returns:
+        Dictionary of Redis persistence configuration
+    """
+    return REDIS_PERSISTENCE_CONFIG.copy()
+
+def get_backup_config() -> Dict[str, Any]:
+    """
+    Get backup configuration.
+    """
+    return BACKUP_CONFIG.copy()

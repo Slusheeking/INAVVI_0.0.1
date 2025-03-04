@@ -28,7 +28,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 from typing import List, Optional
-
+import uuid
 # Add the parent directory to the path so we can import the modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
@@ -38,8 +38,13 @@ from autonomous_trading_system.src.data_acquisition.api.unusual_whales_client im
 from autonomous_trading_system.src.data_acquisition.pipeline.data_pipeline import DataPipeline
 from autonomous_trading_system.src.data_acquisition.validation.data_validator import DataValidator
 from autonomous_trading_system.src.data_acquisition.storage.timescale_storage import TimescaleStorage
-from autonomous_trading_system.src.config.database_config import DB_CONFIG
+from autonomous_trading_system.src.data_acquisition.storage.redis_storage import RedisStorage
+from autonomous_trading_system.src.config.database_config import (
+    get_connection_params,
+    get_redis_connection_params,
+)
 from autonomous_trading_system.src.config.system_config import SYSTEM_CONFIG
+from autonomous_trading_system.src.data_acquisition.storage.data_schema import SystemMetricsSchema
 from autonomous_trading_system.src.utils.logging import setup_logging
 
 # Set up logging
@@ -64,6 +69,8 @@ def parse_args():
                         help="Run in continuous mode")
     parser.add_argument("--interval", type=int, default=60, 
                         help="Interval in seconds for continuous mode")
+    parser.add_argument("--disable-redis", action="store_true",
+                        help="Disable Redis storage (use only TimescaleDB)")
     return parser.parse_args()
 
 def get_default_symbols() -> List[str]:
@@ -76,7 +83,8 @@ def run_data_acquisition(
     days_back: int = 1,
     include_quotes: bool = False,
     include_trades: bool = False,
-    include_options_flow: bool = False
+    include_options_flow: bool = False,
+    use_redis: bool = True
 ) -> bool:
     """
     Run the data acquisition pipeline.
@@ -88,19 +96,43 @@ def run_data_acquisition(
         include_quotes: Whether to include quote data
         include_trades: Whether to include trade data
         include_options_flow: Whether to include options flow data
+        use_redis: Whether to use Redis for caching
         
     Returns:
         bool: True if successful, False otherwise
     """
     try:
-        # Initialize storage
-        storage = TimescaleStorage(
-            host=DB_CONFIG["host"],
-            port=DB_CONFIG["port"],
-            database=DB_CONFIG["database"],
-            user=DB_CONFIG["user"],
-            password=DB_CONFIG["password"]
-        )
+        # Get database connection parameters
+        db_params = get_connection_params()
+        
+        # Initialize TimescaleDB storage
+        try:
+            storage = TimescaleStorage(**db_params)
+            logger.info("Successfully connected to TimescaleDB")
+        except Exception as e:
+            logger.error(f"Failed to connect to TimescaleDB: {e}")
+            return False
+        
+        # Initialize Redis storage if enabled
+        redis_storage = None
+        if use_redis:
+            try:
+                redis_params = get_redis_connection_params()
+                redis_storage = RedisStorage(redis_params)
+                logger.info("Successfully connected to Redis")
+                
+                # Store system status in Redis
+                redis_storage.store_system_status({
+                    'status': 'running',
+                    'component': 'data_acquisition',
+                    'start_time': datetime.now().isoformat(),
+                    'pid': os.getpid(),
+                    'hostname': os.uname().nodename,
+                    'version': '1.0.0'
+                })
+            except Exception as e:
+                logger.warning(f"Failed to connect to Redis, continuing without caching: {e}")
+                redis_storage = None
         
         # Initialize data validator
         validator = DataValidator()
@@ -114,6 +146,7 @@ def run_data_acquisition(
         pipeline = DataPipeline(
             storage=storage,
             validator=validator,
+            redis_storage=redis_storage,
             polygon_client=polygon_client,
             alpaca_client=alpaca_client,
             unusual_whales_client=unusual_whales_client
@@ -126,6 +159,19 @@ def run_data_acquisition(
         # Calculate date range
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days_back)
+        
+        # Track system metrics
+        run_id = str(uuid.uuid4())
+        system_metrics = SystemMetricsSchema(
+            timestamp=datetime.now(),
+            metric_name="data_acquisition_start",
+            metric_value=1.0,
+            component="data_acquisition",
+            host=os.uname().nodename,
+            tags={"run_id": run_id, "symbols": ",".join(symbols), "timeframes": ",".join(timeframes)}
+        )
+        storage.store_from_schema(system_metrics, "system_metrics")
+        start_time = time.time()
         
         logger.info(f"Starting data acquisition for {len(symbols)} symbols from {start_date} to {end_date}")
         
@@ -140,7 +186,31 @@ def run_data_acquisition(
             include_options_flow=include_options_flow
         )
         
-        logger.info(f"Data acquisition completed successfully. Collected {result.get('total_records', 0)} records.")
+        # Calculate execution time
+        execution_time = time.time() - start_time
+        total_records = result.get('total_records', 0)
+        
+        # Track completion metrics
+        completion_metrics = SystemMetricsSchema(
+            timestamp=datetime.now(),
+            metric_name="data_acquisition_complete",
+            metric_value=total_records,
+            component="data_acquisition",
+            host=os.uname().nodename,
+            tags={
+                "run_id": run_id,
+                "execution_time": str(execution_time),
+                "symbols": ",".join(symbols),
+                "timeframes": ",".join(timeframes)
+            }
+        )
+        storage.store_from_schema(completion_metrics, "system_metrics")
+        
+        # Update Redis status if available
+        if redis_storage:
+            redis_storage.store_component_status("data_acquisition", {"status": "idle", "last_run": datetime.now().isoformat(), "records_collected": total_records})
+        
+        logger.info(f"Data acquisition completed successfully. Collected {total_records} records in {execution_time:.2f} seconds.")
         return True
         
     except Exception as e:
@@ -159,6 +229,7 @@ def main():
     include_trades = args.include_trades
     include_options_flow = args.include_options_flow
     continuous = args.continuous
+    use_redis = not args.disable_redis
     interval = args.interval
     
     if continuous:
@@ -170,7 +241,8 @@ def main():
                 days_back=days_back,
                 include_quotes=include_quotes,
                 include_trades=include_trades,
-                include_options_flow=include_options_flow
+                include_options_flow=include_options_flow,
+                use_redis=use_redis
             )
             
             if not success:
@@ -186,7 +258,8 @@ def main():
             days_back=days_back,
             include_quotes=include_quotes,
             include_trades=include_trades,
-            include_options_flow=include_options_flow
+            include_options_flow=include_options_flow,
+            use_redis=use_redis
         )
         
         sys.exit(0 if success else 1)
