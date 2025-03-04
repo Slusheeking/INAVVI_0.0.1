@@ -149,6 +149,7 @@ flowchart TD
     %% Feature Engineering Components
     subgraph "Feature Engineering & Storage"
         FC[Feature Calculator]
+        FSA[FinBERT Sentiment Analyzer]
         MTP[Multi-Timeframe Processor]
         FS[Feature Store]
         FR[Feature Registry]
@@ -156,10 +157,12 @@ flowchart TD
         RC[Redis Cache]
         
         FC --> MTP
+        FSA --> FS
         MTP --> FS
         FS --> FR
         FS --> RC
         FC --> FIA
+        FSA --> FIA
         FIA --> FR
     end
     
@@ -168,6 +171,7 @@ flowchart TD
     
     %% External Connections
     TS1 --> FC
+    TS1 --> FSA
 ```
 
 #### Feature Engineering Process Flow
@@ -176,6 +180,7 @@ flowchart TD
 sequenceDiagram
     participant TS1 as TimescaleDB
     participant FC as Feature Calculator
+    participant FSA as FinBERT Sentiment Analyzer
     participant MTP as Multi-Timeframe Processor
     participant FS as Feature Store
     participant FR as Feature Registry
@@ -203,10 +208,20 @@ sequenceDiagram
     
     MTP->>FS: Send processed features
     
+    FSA->>TS1: Query news articles
+    TS1->>FSA: Return news articles
+    FSA->>FSA: Analyze sentiment with FinBERT
+    FSA->>FSA: Extract entities and keywords
+    FSA->>FSA: Calculate sentiment scores
+    FSA->>FSA: Generate sentiment features
+    FSA->>TS1: Store sentiment analysis results
+    FSA->>FS: Send sentiment features
+    
     FS->>FR: Register features
     FS->>RC: Cache frequently accessed features
     
     FC->>FIA: Send features for importance analysis
+    FSA->>FIA: Send sentiment features for importance analysis
     FIA->>FIA: Calculate feature importance
     FIA->>FR: Update feature importance
 ```
@@ -836,6 +851,7 @@ flowchart TD
     TRADES[Trades Data]
     OPTIONS[Options Flow Data]
     MICRO[Market Microstructure Data]
+    NEWS[Financial News Data]
     
     %% Features
     PRICE[Price Features]
@@ -845,12 +861,14 @@ flowchart TD
     TREND[Trend Features]
     PATTERN[Pattern Features]
     MICRO_F[Microstructure Features]
+    SENTIMENT[Sentiment Features]
     
     %% Models
     XGB[XGBoost Models]
     LSTM[LSTM Models]
     ATTENTION[Attention Models]
     ENSEMBLE[Ensemble Models]
+    FINBERT[FinBERT Model]
     
     %% Trading
     SIGNALS[Trading Signals]
@@ -875,12 +893,14 @@ flowchart TD
     PA --> TRADES
     UW --> OPTIONS
     PA --> MICRO
+    PA --> NEWS
     
     OHLCV --> TS1
     QUOTES --> TS1
     TRADES --> TS1
     OPTIONS --> TS1
     MICRO --> TS1
+    NEWS --> TS1
     
     TS1 --> PRICE
     TS1 --> VOLUME
@@ -889,6 +909,8 @@ flowchart TD
     TS1 --> TREND
     TS1 --> PATTERN
     TS1 --> MICRO_F
+    TS1 --> FINBERT
+    FINBERT --> SENTIMENT
     
     PRICE --> RD
     VOLUME --> RD
@@ -897,6 +919,7 @@ flowchart TD
     TREND --> RD
     PATTERN --> RD
     MICRO_F --> RD
+    SENTIMENT --> RD
     
     RD --> XGB
     RD --> LSTM

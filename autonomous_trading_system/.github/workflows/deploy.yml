@@ -1,0 +1,155 @@
+name: Deploy to Production
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          
+      - name: Build and push production images
+        run: |
+          # Build and tag all Docker images with the release version
+          
+          # Base image
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ats:${{ steps.get_version.outputs.VERSION }} \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/ats:latest \
+            -f ./autonomous_trading_system/deployment/docker/Dockerfile .
+            
+          # GPU-accelerated image
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ats-gpu:${{ steps.get_version.outputs.VERSION }} \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/ats-gpu:latest \
+            -f ./autonomous_trading_system/deployment/docker/gpu-accelerated.Dockerfile .
+            
+          # Component images
+          declare -a components=(
+            "data-acquisition"
+            "feature-engineering"
+            "model-training"
+            "trading-strategy"
+            "monitoring"
+            "continuous-learning"
+          )
+          
+          for component in "${components[@]}"; do
+            # Build regular version
+            docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ats-${component}:${{ steps.get_version.outputs.VERSION }} \
+              -t ${{ secrets.DOCKERHUB_USERNAME }}/ats-${component}:latest \
+              -f ./autonomous_trading_system/deployment/docker/${component}.Dockerfile .
+              
+            # Build GPU version
+            if [[ "$component" =~ ^(model-training|feature-engineering|trading-strategy)$ ]]; then
+              docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ats-${component}-gpu:${{ steps.get_version.outputs.VERSION }} \
+                -t ${{ secrets.DOCKERHUB_USERNAME }}/ats-${component}-gpu:latest \
+                --build-arg BASE_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/ats-gpu:${{ steps.get_version.outputs.VERSION }} \
+                -f ./autonomous_trading_system/deployment/docker/${component}.Dockerfile .
+            fi
+          done
+          
+          # Push all images
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats:${{ steps.get_version.outputs.VERSION }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats-gpu:${{ steps.get_version.outputs.VERSION }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats-gpu:latest
+          
+          for component in "${components[@]}"; do
+            docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats-${component}:${{ steps.get_version.outputs.VERSION }}
+            docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats-${component}:latest
+            
+            if [[ "$component" =~ ^(model-training|feature-engineering|trading-strategy)$ ]]; then
+              docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats-${component}-gpu:${{ steps.get_version.outputs.VERSION }}
+              docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats-${component}-gpu:latest
+            fi
+          done
+      
+      - name: Deploy to Kubernetes
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/stable.txt"
+          curl -LO "https://dl.k8s.io/$(cat stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          
+          # Set up kubeconfig
+          echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
+          export KUBECONFIG=./kubeconfig.yaml
+          
+          # Update Kubernetes manifests with new version
+          find ./autonomous_trading_system/deployment/kubernetes/production -name "*.yaml" -type f -exec sed -i \
+            -e "s|image: .*ats:|image: ${{ secrets.DOCKERHUB_USERNAME }}/ats:|g" \
+            -e "s|image: .*ats-gpu:|image: ${{ secrets.DOCKERHUB_USERNAME }}/ats-gpu:|g" \
+            -e "s|:latest|:${{ steps.get_version.outputs.VERSION }}|g" {} \;
+          
+          # Apply Kubernetes configurations
+          kubectl apply -f ./autonomous_trading_system/deployment/kubernetes/production/
+          
+          # Wait for rollouts to complete
+          declare -a deployments=(
+            "ats-data-acquisition"
+            "ats-feature-engineering"
+            "ats-model-training"
+            "ats-trading-strategy"
+            "ats-monitoring"
+            "ats-continuous-learning"
+          )
+          
+          for deployment in "${deployments[@]}"; do
+            kubectl rollout status deployment/${deployment} -n production --timeout=300s
+          done
+          
+      - name: Create Release Notes
+        run: |
+          echo "## Release ${{ steps.get_version.outputs.VERSION }}" > release_notes.md
+          echo "### Docker Images" >> release_notes.md
+          echo "- Base: \`${{ secrets.DOCKERHUB_USERNAME }}/ats:${{ steps.get_version.outputs.VERSION }}\`" >> release_notes.md
+          echo "- GPU: \`${{ secrets.DOCKERHUB_USERNAME }}/ats-gpu:${{ steps.get_version.outputs.VERSION }}\`" >> release_notes.md
+          echo "### Component Images" >> release_notes.md
+          for component in data-acquisition feature-engineering model-training trading-strategy monitoring continuous-learning; do
+            echo "- ${component}: \`${{ secrets.DOCKERHUB_USERNAME }}/ats-${component}:${{ steps.get_version.outputs.VERSION }}\`" >> release_notes.md
+            if [[ "$component" =~ ^(model-training|feature-engineering|trading-strategy)$ ]]; then
+              echo "- ${component}-gpu: \`${{ secrets.DOCKERHUB_USERNAME }}/ats-${component}-gpu:${{ steps.get_version.outputs.VERSION }}\`" >> release_notes.md
+            fi
+          done
+          
+      - name: Update Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release_notes.md
+          body_path: release_notes.md
+          
+      - name: Notify Slack on Success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: deployments
+          SLACK_COLOR: good
+          SLACK_TITLE: Production Deployment Successful
+          SLACK_MESSAGE: "Version ${{ steps.get_version.outputs.VERSION }} has been deployed to production! Release notes have been published."
+          
+      - name: Notify Slack on Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: deployments
+          SLACK_COLOR: danger
+          SLACK_TITLE: Production Deployment Failed
+          SLACK_MESSAGE: "Deployment of version ${{ steps.get_version.outputs.VERSION }} failed. Please check the logs."

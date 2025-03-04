@@ -1,0 +1,226 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ats-model-training
+  namespace: ats-prod
+  labels:
+    app: ats
+    component: model-training
+    environment: production
+  annotations:
+    description: "Model training component for the Autonomous Trading System"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ats
+      component: model-training
+      environment: production
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: ats
+        component: model-training
+        environment: production
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: ats-service-account
+      nodeSelector:
+        cloud.google.com/gke-nodepool: ats-prod-pool
+        kubernetes.io/os: linux
+      tolerations:
+        - key: "dedicated"
+          operator: "Equal"
+          value: "ats"
+          effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: component
+                      operator: In
+                      values:
+                        - model-training
+                topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: model-training
+          image: ${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/ats-model-training-gpu:${VERSION}
+          imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: "4000m"
+              memory: "8Gi"
+              nvidia.com/gpu: "2"
+            requests:
+              cpu: "2000m"
+              memory: "4Gi"
+          env:
+            - name: ENVIRONMENT
+              value: "production"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: CUDA_VISIBLE_DEVICES
+              value: "0,1"
+            - name: TF_FORCE_GPU_ALLOW_GROWTH
+              value: "true"
+            - name: TF_XLA_FLAGS
+              value: "--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit"
+            - name: PYTORCH_CUDA_ALLOC_CONF
+              value: "max_split_size_mb:512"
+            - name: NCCL_P2P_LEVEL
+              value: "NVL"
+            - name: NCCL_IB_HCA
+              value: "mlx5"
+            - name: NCCL_NVLS_ENABLE
+              value: "1"
+            - name: NCCL_NVLS_MEMOPS_ENABLE
+              value: "1"
+            - name: NCCL_NVLS_MEMOPS_P2P_ENABLE
+              value: "1"
+            - name: MODEL_REGISTRY_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ats-config
+                  key: model_registry_url
+            - name: FEATURE_STORE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: ats-config
+                  key: feature_store_url
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ats-config
+                  key: redis_host
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ats-config
+                  key: redis_port
+            - name: TIMESCALEDB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ats-config
+                  key: timescaledb_host
+            - name: TIMESCALEDB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ats-config
+                  key: timescaledb_port
+            - name: TIMESCALEDB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ats-secrets
+                  key: timescaledb_user
+            - name: TIMESCALEDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ats-secrets
+                  key: timescaledb_password
+            - name: TIMESCALEDB_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: ats-config
+                  key: timescaledb_database
+          ports:
+            - containerPort: 8000
+              name: http
+            - containerPort: 8001
+              name: grpc
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          volumeMounts:
+            - name: model-storage
+              mountPath: /app/models
+            - name: config-volume
+              mountPath: /app/config
+            - name: secrets-volume
+              mountPath: /app/secrets
+              readOnly: true
+            - name: tmp-volume
+              mountPath: /tmp
+        - name: model-training-sidecar
+          image: ${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/ats-monitoring:${VERSION}
+          imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+          env:
+            - name: ENVIRONMENT
+              value: "production"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: COMPONENT
+              value: "model-training"
+            - name: PROMETHEUS_PUSH_GATEWAY
+              valueFrom:
+                configMapKeyRef:
+                  name: ats-config
+                  key: prometheus_push_gateway
+          ports:
+            - containerPort: 9090
+              name: metrics
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config
+      volumes:
+        - name: model-storage
+          persistentVolumeClaim:
+            claimName: ats-model-storage-pvc
+        - name: config-volume
+          configMap:
+            name: ats-config
+        - name: secrets-volume
+          secret:
+            secretName: ats-secrets
+        - name: tmp-volume
+          emptyDir:
+            sizeLimit: 2Gi
+      imagePullSecrets:
+        - name: docker-registry-secret

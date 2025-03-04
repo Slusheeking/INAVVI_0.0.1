@@ -1,0 +1,21 @@
+# NLP and Sentiment Analysis dependencies
+transformers>=4.28.0
+torch>=2.0.0
+nltk>=3.8.1
+spacy>=3.5.2
+
+# Data processing
+pandas>=1.5.3
+numpy>=1.24.2
+scikit-learn>=1.2.2
+
+# Utilities
+python-dotenv>=1.0.0
+tqdm>=4.65.0
+loguru>=0.6.0
+requests>=2.28.2
+
+# Database connections
+sqlalchemy>=2.0.7
+psycopg2-binary>=2.9.5
+redis>=4.5.4

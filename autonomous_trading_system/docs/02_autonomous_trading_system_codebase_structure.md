@@ -82,6 +82,9 @@ autonomous_trading_system/
 | `calculators/trend_features.py` | Trend feature calculators |
 | `calculators/pattern_features.py` | Pattern recognition feature calculators |
 | `calculators/microstructure_features.py` | Market microstructure feature calculators |
+| `text_analysis/` | Text analysis components |
+| `text_analysis/finbert_sentiment.py` | FinBERT sentiment analyzer |
+| `text_analysis/entity_extractor.py` | Entity extraction from financial text |
 | `store/` | Feature store components |
 | `store/feature_store.py` | Feature store implementation |
 | `store/feature_registry.py` | Feature registry |
@@ -102,6 +105,7 @@ autonomous_trading_system/
 | `models/lstm_model.py` | LSTM model implementation |
 | `models/attention_model.py` | Attention model implementation |
 | `models/ensemble_model.py` | Ensemble model implementation |
+| `models/finbert_model.py` | FinBERT model for sentiment analysis |
 | `optimization/` | Optimization components |
 | `optimization/dollar_profit_objective.py` | Dollar profit objective function |
 | `optimization/hyperparameter_tuner.py` | Hyperparameter tuner |
@@ -221,6 +225,7 @@ autonomous_trading_system/
 | `run_trading_strategy.py` | Script to run trading strategy |
 | `run_monitoring.py` | Script to run monitoring |
 | `run_continuous_learning.py` | Script to run continuous learning |
+| `run_sentiment_analysis.py` | Script to run sentiment analysis on news articles |
 | `system_controller.py` | System controller script |
 | `setup_environment.py` | Environment setup script |
 
@@ -488,6 +493,9 @@ python -m src.scripts.run_monitoring
 
 # Start continuous learning
 python -m src.scripts.run_continuous_learning
+
+# Start sentiment analysis
+python -m src.scripts.run_sentiment_analysis
 ```
 
 #### 4.3 Check System Status

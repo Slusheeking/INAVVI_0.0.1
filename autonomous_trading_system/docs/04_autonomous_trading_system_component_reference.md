@@ -293,6 +293,69 @@ historical_data = db_manager.get_price_data(
 
 ## Feature Engineering & Storage Components
 
+### FinBERTSentimentAnalyzer
+
+**Purpose**: Analyzes sentiment of financial news articles using FinBERT, a pre-trained NLP model based on BERT that's specifically fine-tuned for financial text.
+
+**Architecture**:
+```mermaid
+classDiagram
+    class FinBERTSentimentAnalyzer {
+        -model_name: str
+        -device: str
+        -batch_size: int
+        -max_length: int
+        -use_spacy: bool
+        -tokenizer: AutoTokenizer
+        -model: AutoModelForSequenceClassification
+        -nlp: SpacyModel
+        -db_engine: Engine
+        -Session: sessionmaker
+        -LABEL_MAPPING: dict
+        -MODEL_VERSION: str
+        +__init__(model_name: str, device: str, batch_size: int, max_length: int, use_spacy: bool)
+        +analyze_text(text: str) -> dict
+        +analyze_news_articles(start_date: datetime, end_date: datetime, symbols: list, limit: int, store: bool) -> DataFrame
+        +get_sentiment_for_symbol(symbol: str, start_date: datetime, end_date: datetime, limit: int) -> DataFrame
+        +get_sentiment_features(symbols: list, start_date: datetime, end_date: datetime, window_sizes: list) -> DataFrame
+        +store_sentiment_features(features_df: DataFrame) -> int
+        -_analyze_batch(sentences: list) -> list
+        -_extract_entities(text: str) -> dict
+        -_extract_keywords(text: str, top_n: int) -> list
+    }
+```
+
+**Interfaces**:
+- **Input**: Financial news articles or text
+- **Output**: Sentiment analysis results and features
+
+**Implementation Details**:
+- Uses FinBERT, a financial domain-specific BERT model
+- Analyzes sentiment (positive, negative, neutral) with confidence scores
+- Extracts entities and keywords from text using spaCy
+- Processes news articles in batches for efficiency
+- Generates sentiment features across different time windows
+- Stores results in TimescaleDB for historical analysis
+- Supports GPU acceleration for faster processing
+
+**Example Usage**:
+```python
+analyzer = FinBERTSentimentAnalyzer(
+    model_name="ProsusAI/finbert",
+    device="cuda",
+    batch_size=16,
+    max_length=512,
+    use_spacy=True
+)
+sentiment = analyzer.analyze_text("The company reported better than expected earnings, with revenue growth of 15%.")
+sentiment_features = analyzer.get_sentiment_features(
+    symbols=["AAPL", "MSFT", "GOOGL"],
+    start_date=datetime(2023, 1, 1),
+    end_date=datetime(2023, 1, 31),
+    window_sizes=[1, 3, 7, 14, 30]
+)
+```
+
 ### FeatureCalculator
 
 **Purpose**: Calculates various features from raw market data.
@@ -490,7 +553,7 @@ top_features = analyzer.get_top_features(10)
 
 ### ModelTrainer
 
-**Purpose**: Trains machine learning models for price prediction.
+**Purpose**: Trains machine learning models for price prediction and sentiment analysis.
 
 **Architecture**:
 ```mermaid
@@ -518,7 +581,7 @@ classDiagram
 - **Output**: Trained model ID
 
 **Implementation Details**:
-- Supports different model types (XGBoost, LSTM, Attention, Ensemble)
+- Supports different model types (XGBoost, LSTM, Attention, Ensemble, FinBERT)
 - Implements dollar profit optimization
 - Uses GPU acceleration for model training
 - Evaluates models with various metrics

@@ -89,6 +89,7 @@ The Data Acquisition & Processing subsystem is responsible for gathering market 
 - Trades data
 - Options flow data
 - Market microstructure data
+- Financial news articles
 
 ### 2. Feature Engineering & Storage
 
@@ -96,6 +97,7 @@ The Feature Engineering & Storage subsystem calculates various features from raw
 
 **Key Components:**
 - **Multi-Timeframe Feature Calculation**: Computes features across multiple timeframes
+- **FinBERT Sentiment Analysis**: Analyzes sentiment of financial news using NLP
 - **Feature Store**: Stores and manages features with Redis caching
 - **Feature Importance Analyzer**: Tracks feature importance over time
 
@@ -107,6 +109,7 @@ The Feature Engineering & Storage subsystem calculates various features from raw
 - Trend features (ADX, directional movement, etc.)
 - Pattern recognition features (candlestick patterns, etc.)
 - Market microstructure features (order book imbalance, etc.)
+- Sentiment features (news sentiment, entity recognition, etc.)
 
 ### 3. Model Training & Inference
 
@@ -124,6 +127,7 @@ The Model Training & Inference subsystem implements various machine learning mod
 - LSTM with multi-timeframe inputs
 - Multi-head attention models
 - Ensemble models
+- FinBERT for financial sentiment analysis
 
 ### 4. Trading Strategy & Execution
 
@@ -283,6 +287,8 @@ The system operates according to the following workflow:
 - Grafana
 - TensorFlow or PyTorch
 - XGBoost
+- Transformers (for FinBERT)
+- NLTK and spaCy for NLP
 - Pandas, NumPy, Scikit-learn
 - GitHub Actions or similar CI/CD tool
 - Alpaca SDK
@@ -300,6 +306,7 @@ The system operates according to the following workflow:
 - **Dynamic Ticker Selection**: Selects the most promising tickers from a large universe
 - **Risk-Based Position Sizing**: Sizes positions based on risk parameters
 - **Adaptive Exit Timing**: Identifies optimal exit points based on market conditions
+- **Financial News Sentiment Analysis**: Analyzes sentiment of financial news using FinBERT
 - **Comprehensive Monitoring**: Tracks system performance and health
 - **Continuous Learning**: Adapts to changing market conditions
 - **Automated Deployment**: Ensures consistent and reliable deployment

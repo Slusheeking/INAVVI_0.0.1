@@ -236,6 +236,25 @@ The database architecture follows a hybrid approach:
 - Index on (`published_utc`)
 - Index on (`tickers`) using GIN
 
+#### `news_sentiment`
+| Column | Type | Description | Constraints |
+|--------|------|-------------|-------------|
+| `article_id` | VARCHAR(64) | Reference to news article | REFERENCES news_articles(article_id) |
+| `timestamp` | TIMESTAMPTZ | Analysis timestamp | NOT NULL |
+| `symbol` | VARCHAR(16) | Ticker symbol | NOT NULL |
+| `sentiment_score` | NUMERIC(5,4) | Sentiment score (-1 to 1) | NOT NULL |
+| `sentiment_label` | VARCHAR(16) | Sentiment label (positive, negative, neutral) | NOT NULL |
+| `confidence` | NUMERIC(5,4) | Confidence score (0-1) | NOT NULL |
+| `entity_mentions` | JSONB | Entities mentioned in the article | |
+| `keywords` | JSONB | Keywords extracted from the article | |
+| `model_version` | VARCHAR(32) | Version of the sentiment model | NOT NULL |
+
+**Indexes**:
+- Primary key on (`article_id`, `symbol`)
+- Index on (`symbol`, `timestamp`)
+- Index on (`sentiment_label`, `confidence`)
+- Index on (`sentiment_score`)
+
 ### Feature Engineering Tables
 
 #### `features`
@@ -510,7 +529,7 @@ The system ensures seamless flow from API endpoints to database tables:
    - Trades endpoint → trades table
    - Quotes endpoint → quotes table
    - Reference data endpoints → ticker_details table
-   - News endpoint → news_articles table
+   - News endpoint → news_articles table → news_sentiment table (via FinBERT analysis)
    - Market status endpoints → market_status and market_holidays tables
 
 2. **Polygon WebSocket → Database**:

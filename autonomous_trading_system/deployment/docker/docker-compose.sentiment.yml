@@ -1,0 +1,89 @@
+version: '3.8'
+
+networks:
+  ats_network:
+    driver: bridge
+
+services:
+
+  # Sentiment Analysis service
+  sentiment-analysis:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/sentiment-analysis.Dockerfile
+    container_name: sentiment-analysis
+    restart: unless-stopped
+    depends_on:
+      - timescaledb
+      - redis
+    external_links:
+      - timescaledb:timescaledb
+      - redis:redis
+    environment:
+      - TIMESCALEDB_HOST=timescaledb
+      - TIMESCALEDB_PORT=5432
+      - TIMESCALEDB_USER=ats_user
+      - TIMESCALEDB_PASSWORD=your_database_password_here
+      - TIMESCALEDB_DATABASE=ats_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USE_GPU=${USE_GPU:-false}
+      - PYTHONPATH=/app
+      - LOG_LEVEL=INFO
+    volumes:
+      # Mount the source code
+      - ../../:/app
+    networks:
+      - ats_network
+    command: ["python", "src/scripts/run_sentiment_analysis.py", "--days", "7", "--continuous"]
+
+  # Feature Engineering service
+  feature-engineering:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/feature-engineering.Dockerfile
+    container_name: feature-engineering
+    restart: unless-stopped
+    depends_on:
+      - timescaledb
+      - redis
+    external_links:
+      - timescaledb:timescaledb
+      - redis:redis
+    environment:
+      - TIMESCALEDB_HOST=timescaledb
+      - TIMESCALEDB_PORT=5432
+      - TIMESCALEDB_USER=ats_user
+      - TIMESCALEDB_PASSWORD=your_database_password_here
+      - TIMESCALEDB_DATABASE=ats_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SKIP_SENTIMENT=true  # Skip sentiment analysis as it's handled by the sentiment-analysis service
+    volumes:
+      - ../../:/app
+    networks:
+      - ats_network
+    command: ["python", "src/scripts/run_feature_engineering.py", "--days", "7", "--continuous", "--skip-sentiment"]
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    depends_on:
+      - timescaledb
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../../deployment/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ../../deployment/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    external_links:
+      - timescaledb:timescaledb
+
+volumes:
+  grafana_data:

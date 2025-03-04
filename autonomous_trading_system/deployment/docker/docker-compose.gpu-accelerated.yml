@@ -1,0 +1,369 @@
+version: '3.8'
+
+services:
+  # TimescaleDB for time-series data storage
+  timescaledb:
+    image: timescale/timescaledb:latest-pg14
+    container_name: ats-timescaledb
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=ats_user
+      - POSTGRES_PASSWORD=secure_password_here
+      - POSTGRES_DB=ats_db
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ats_user -d ats_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ats-network
+
+  # Redis for caching and messaging
+  redis:
+    image: redis:latest
+    container_name: ats-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ats-network
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ats-prometheus
+    restart: unless-stopped
+    volumes:
+      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../monitoring/prometheus/rules:/etc/prometheus/rules
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - ats-network
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ats-grafana
+    restart: unless-stopped
+    volumes:
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ../monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - ats-network
+
+  # Node Exporter for system metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: ats-node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
+    networks:
+      - ats-network
+
+  # DCGM Exporter for NVIDIA GPU metrics
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:3.1.7-3.1.4-ubuntu20.04
+    container_name: ats-dcgm-exporter
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    ports:
+      - "9400:9400"
+    networks:
+      - ats-network
+
+  # AlertManager for alerts
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: ats-alertmanager
+    restart: unless-stopped
+    volumes:
+      - ../monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - ../monitoring/alertmanager/templates:/etc/alertmanager/templates
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - "9093:9093"
+    networks:
+      - ats-network
+
+  # Data Acquisition Service
+  data-acquisition:
+    image: ats-gpu-accelerated:latest
+    build:
+      context: ../../
+      dockerfile: deployment/docker/gpu-accelerated.Dockerfile
+    container_name: ats-data-acquisition
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - COMPONENT=data_acquisition
+      - TIMESCALEDB_HOST=timescaledb
+      - TIMESCALEDB_PORT=5432
+      - TIMESCALEDB_DATABASE=ats_db
+      - TIMESCALEDB_USER=ats_user
+      - TIMESCALEDB_PASSWORD=secure_password_here
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USE_GPU=true
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=production
+    volumes:
+      - ../../.env:/app/.env
+      - data_volume:/app/data
+      - model_volume:/app/models
+    depends_on:
+      - timescaledb
+      - redis
+    networks:
+      - ats-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Feature Engineering Service
+  feature-engineering:
+    image: ats-gpu-accelerated:latest
+    container_name: ats-feature-engineering
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - COMPONENT=feature_engineering
+      - TIMESCALEDB_HOST=timescaledb
+      - TIMESCALEDB_PORT=5432
+      - TIMESCALEDB_DATABASE=ats_db
+      - TIMESCALEDB_USER=ats_user
+      - TIMESCALEDB_PASSWORD=secure_password_here
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USE_GPU=true
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=production
+    volumes:
+      - ../../.env:/app/.env
+      - data_volume:/app/data
+      - model_volume:/app/models
+    depends_on:
+      - timescaledb
+      - redis
+      - data-acquisition
+    networks:
+      - ats-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Model Training Service
+  model-training:
+    image: ats-gpu-accelerated:latest
+    container_name: ats-model-training
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - COMPONENT=model_training
+      - TIMESCALEDB_HOST=timescaledb
+      - TIMESCALEDB_PORT=5432
+      - TIMESCALEDB_DATABASE=ats_db
+      - TIMESCALEDB_USER=ats_user
+      - TIMESCALEDB_PASSWORD=secure_password_here
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USE_GPU=true
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=production
+    volumes:
+      - ../../.env:/app/.env
+      - data_volume:/app/data
+      - model_volume:/app/models
+    depends_on:
+      - timescaledb
+      - redis
+      - feature-engineering
+    networks:
+      - ats-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Trading Strategy Service
+  trading-strategy:
+    image: ats-gpu-accelerated:latest
+    container_name: ats-trading-strategy
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - COMPONENT=trading_strategy
+      - TIMESCALEDB_HOST=timescaledb
+      - TIMESCALEDB_PORT=5432
+      - TIMESCALEDB_DATABASE=ats_db
+      - TIMESCALEDB_USER=ats_user
+      - TIMESCALEDB_PASSWORD=secure_password_here
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USE_GPU=true
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=production
+    volumes:
+      - ../../.env:/app/.env
+      - data_volume:/app/data
+      - model_volume:/app/models
+    depends_on:
+      - timescaledb
+      - redis
+      - model-training
+    networks:
+      - ats-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Monitoring Service
+  monitoring:
+    image: ats-gpu-accelerated:latest
+    container_name: ats-monitoring
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - COMPONENT=monitoring
+      - TIMESCALEDB_HOST=timescaledb
+      - TIMESCALEDB_PORT=5432
+      - TIMESCALEDB_DATABASE=ats_db
+      - TIMESCALEDB_USER=ats_user
+      - TIMESCALEDB_PASSWORD=secure_password_here
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USE_GPU=true
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=production
+    volumes:
+      - ../../.env:/app/.env
+      - data_volume:/app/data
+      - model_volume:/app/models
+    depends_on:
+      - timescaledb
+      - redis
+      - prometheus
+      - grafana
+    networks:
+      - ats-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Continuous Learning Service
+  continuous-learning:
+    image: ats-gpu-accelerated:latest
+    container_name: ats-continuous-learning
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - COMPONENT=continuous_learning
+      - TIMESCALEDB_HOST=timescaledb
+      - TIMESCALEDB_PORT=5432
+      - TIMESCALEDB_DATABASE=ats_db
+      - TIMESCALEDB_USER=ats_user
+      - TIMESCALEDB_PASSWORD=secure_password_here
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USE_GPU=true
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=production
+    volumes:
+      - ../../.env:/app/.env
+      - data_volume:/app/data
+      - model_volume:/app/models
+    depends_on:
+      - timescaledb
+      - redis
+      - model-training
+      - trading-strategy
+    networks:
+      - ats-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+networks:
+  ats-network:
+    driver: bridge
+
+volumes:
+  timescaledb_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:
+  data_volume:
+  model_volume:

@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: nvidia-dcgm-exporter
+  namespace: monitoring
+  labels:
+    app: nvidia-dcgm-exporter
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter
+  podMetricsEndpoints:
+  - port: metrics
+    interval: 15s
+    scrapeTimeout: 10s

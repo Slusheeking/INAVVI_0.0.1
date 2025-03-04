@@ -1,0 +1,134 @@
+groups:
+  - name: gpu_monitoring
+    rules:
+      # GPU Utilization Alerts
+      - alert: GPUHighUtilization
+        expr: nvidia_gpu_utilization > 95
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GPU Utilization ({{ $value }}%)"
+          description: "GPU {{ $labels.gpu }} has been at {{ $value }}% utilization for 5 minutes."
+
+      - alert: GPUMemoryNearCapacity
+        expr: (nvidia_gpu_memory_used_bytes / nvidia_gpu_memory_total_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GPU Memory Near Capacity ({{ $value }}%)"
+          description: "GPU {{ $labels.gpu }} memory usage is at {{ $value }}% for 5 minutes."
+
+      - alert: GPUTemperatureHigh
+        expr: nvidia_gpu_temperature_celsius > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GPU Temperature ({{ $value }}°C)"
+          description: "GPU {{ $labels.gpu }} temperature is {{ $value }}°C for 5 minutes."
+
+      # GPU Performance Recording Rules
+      - record: gpu:memory_utilization:ratio
+        expr: nvidia_gpu_memory_used_bytes / nvidia_gpu_memory_total_bytes
+
+      - record: gpu:power_usage:ratio
+        expr: nvidia_gpu_power_usage_watts / nvidia_gpu_power_limit_watts
+
+      - record: gpu:training_batch_throughput:rate5m
+        expr: rate(training_batch_processed_total[5m])
+
+      # GPU Error Detection
+      - alert: GPUErrorsDetected
+        expr: nvidia_gpu_ecc_errors_total > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "GPU ECC Errors Detected"
+          description: "GPU {{ $labels.gpu }} has detected {{ $value }} ECC errors."
+
+      - alert: GPUProcessCrash
+        expr: nvidia_gpu_num_processes < 1 and on(instance) (nvidia_gpu_utilization > 0)
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "GPU Process Crash Detected"
+          description: "No processes running on active GPU {{ $labels.gpu }}."
+
+      # Trading System Specific Rules
+      - alert: ModelTrainingSlowdown
+        expr: rate(model_training_step_duration_seconds_sum[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Model Training Performance Degradation"
+          description: "Average training step duration is {{ $value }}s over 5 minutes."
+
+      - alert: FeatureEngineeringLatency
+        expr: rate(feature_engineering_batch_duration_seconds_sum[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Feature Engineering Performance Degradation"
+          description: "Average feature engineering batch duration is {{ $value }}s over 5 minutes."
+
+      - alert: InferencePipelineLatency
+        expr: rate(model_inference_duration_seconds_sum[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Inference Pipeline Performance Degradation"
+          description: "Average inference duration is {{ $value }}s over 5 minutes."
+
+      # Resource Efficiency Rules
+      - record: gpu:training_efficiency:ratio
+        expr: rate(training_samples_processed_total[5m]) / nvidia_gpu_utilization
+
+      - record: gpu:memory_efficiency:ratio
+        expr: rate(active_memory_allocations_bytes[5m]) / nvidia_gpu_memory_total_bytes
+
+      # GH200 Specific Monitoring
+      - alert: GH200MemoryBandwidthDrop
+        expr: rate(nvidia_gpu_memory_bandwidth_bytes_total[5m]) < 1e12
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GH200 Memory Bandwidth Below Expected"
+          description: "Memory bandwidth is {{ $value | humanize }}B/s, below expected 1TB/s."
+
+      - alert: GH200PowerEfficiency
+        expr: nvidia_gpu_power_usage_watts / rate(training_samples_processed_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GH200 Power Efficiency Degraded"
+          description: "Power usage per training sample is {{ $value }}W, above threshold."
+
+# Recording rules for dashboards
+  - name: gpu_dashboard_metrics
+    rules:
+      - record: gpu:utilization:avg_5m
+        expr: avg_over_time(nvidia_gpu_utilization[5m])
+
+      - record: gpu:memory_used:avg_5m
+        expr: avg_over_time(nvidia_gpu_memory_used_bytes[5m])
+
+      - record: gpu:power_usage:avg_5m
+        expr: avg_over_time(nvidia_gpu_power_usage_watts[5m])
+
+      - record: gpu:temperature:avg_5m
+        expr: avg_over_time(nvidia_gpu_temperature_celsius[5m])
+
+      - record: gpu:training_throughput:avg_5m
+        expr: rate(training_samples_processed_total[5m])
+
+      - record: gpu:inference_latency:avg_5m
+        expr: rate(model_inference_duration_seconds_sum[5m]) / rate(model_inference_duration_seconds_count[5m])
