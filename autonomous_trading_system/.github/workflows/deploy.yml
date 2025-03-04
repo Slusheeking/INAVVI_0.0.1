@@ -1,0 +1,94 @@
+name: Deploy
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          
+      - name: Build and push all images with version tag
+        run: |
+          # Build and tag all Docker images with the release version
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ats:${{ steps.get_version.outputs.VERSION }} -f ./autonomous_trading_system/deployment/docker/Dockerfile .
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ats-data-acquisition:${{ steps.get_version.outputs.VERSION }} -f ./autonomous_trading_system/deployment/docker/data-acquisition.Dockerfile .
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ats-feature-engineering:${{ steps.get_version.outputs.VERSION }} -f ./autonomous_trading_system/deployment/docker/feature-engineering.Dockerfile .
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ats-model-training:${{ steps.get_version.outputs.VERSION }} -f ./autonomous_trading_system/deployment/docker/model-training.Dockerfile .
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ats-trading-strategy:${{ steps.get_version.outputs.VERSION }} -f ./autonomous_trading_system/deployment/docker/trading-strategy.Dockerfile .
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ats-monitoring:${{ steps.get_version.outputs.VERSION }} -f ./autonomous_trading_system/deployment/docker/monitoring.Dockerfile .
+          
+          # Push all images to DockerHub
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats:${{ steps.get_version.outputs.VERSION }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats-data-acquisition:${{ steps.get_version.outputs.VERSION }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats-feature-engineering:${{ steps.get_version.outputs.VERSION }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats-model-training:${{ steps.get_version.outputs.VERSION }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats-trading-strategy:${{ steps.get_version.outputs.VERSION }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/ats-monitoring:${{ steps.get_version.outputs.VERSION }}
+      
+      - name: Check if KUBECONFIG exists
+        id: check_kubeconfig
+        run: |
+          if [ -n "${{ secrets.KUBECONFIG }}" ]; then
+            echo "has_kubeconfig=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_kubeconfig=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Deploy to Kubernetes
+        if: steps.check_kubeconfig.outputs.has_kubeconfig == 'true'
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/stable.txt"
+          curl -LO "https://dl.k8s.io/$(cat stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          
+          # Set up kubeconfig
+          echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
+          export KUBECONFIG=./kubeconfig.yaml
+          
+          # Update Kubernetes deployment files with the new version
+          find ./autonomous_trading_system/deployment/kubernetes/production -name "*.yaml" -type f -exec sed -i "s|image: .*|image: ${{ secrets.DOCKERHUB_USERNAME }}/ats:${{ steps.get_version.outputs.VERSION }}|g" {} \;
+          
+          # Apply Kubernetes configurations
+          kubectl apply -f ./autonomous_trading_system/deployment/kubernetes/production/
+          
+          # Verify deployment
+          kubectl rollout status deployment/ats-deployment -n production
+          
+      - name: Notify Slack on Success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: deployments
+          SLACK_COLOR: good
+          SLACK_TITLE: Deployment Successful
+          SLACK_MESSAGE: "Version ${{ steps.get_version.outputs.VERSION }} has been deployed to production!"
+          
+      - name: Notify Slack on Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: deployments
+          SLACK_COLOR: danger
+          SLACK_TITLE: Deployment Failed
+          SLACK_MESSAGE: "Deployment of version ${{ steps.get_version.outputs.VERSION }} failed. Please check the logs."
